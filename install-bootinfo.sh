@@ -134,9 +134,18 @@ echo "  • Manually update:       sudo /usr/local/bin/bootinfo.sh"
 echo "  • Disable at boot:       sudo systemctl disable bootinfo.service bootinfo.path"
 echo ""
 
-# Delete the install script
+# Delete the install script and parent directory
 SCRIPT_PATH="$(readlink -f "$0")"
-echo "Cleaning up installation script..."
-rm -f "$SCRIPT_PATH"
-echo "✓ Installation script deleted"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+echo "Cleaning up installation files..."
+
+# Check if we're in a bootinfo directory
+if [[ "$SCRIPT_DIR" == *"/bootinfo"* ]] || [[ "$(basename "$SCRIPT_DIR")" == "bootinfo" ]]; then
+    cd /tmp
+    rm -rf "$SCRIPT_DIR"
+    echo "✓ Deleted bootinfo directory and all contents"
+else
+    rm -f "$SCRIPT_PATH"
+    echo "✓ Installation script deleted"
+fi
 echo ""
