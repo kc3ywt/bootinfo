@@ -128,15 +128,24 @@ echo ""
 echo "Configuring SSH to display banner..."
 if [ -f /etc/ssh/sshd_config ]; then
     # Backup original config
-    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup 2>/dev/null || true
     
     # Remove or comment out any existing Banner lines
     sed -i 's/^Banner/#Banner/' /etc/ssh/sshd_config
     
-    # Add our Banner configuration
-    echo "" >> /etc/ssh/sshd_config
-    echo "# Custom boot info banner" >> /etc/ssh/sshd_config
-    echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
+    # Add our Banner configuration at the end
+    if ! grep -q "# Custom boot info banner" /etc/ssh/sshd_config; then
+        echo "" >> /etc/ssh/sshd_config
+        echo "# Custom boot info banner" >> /etc/ssh/sshd_config
+        echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
+    fi
+    
+    # Also ensure DebianBanner is set to no (this shows after username on Debian)
+    if grep -q "^DebianBanner" /etc/ssh/sshd_config; then
+        sed -i 's/^DebianBanner.*/DebianBanner no/' /etc/ssh/sshd_config
+    else
+        echo "DebianBanner no" >> /etc/ssh/sshd_config
+    fi
     
     # Restart SSH service
     systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
