@@ -62,8 +62,32 @@ WantedBy=multi-user.target
 EOF
 echo "✓ Created bootinfo.service"
 
+# Add to shell profile for terminal display
+echo "[3/5] Adding to shell profiles..."
+DISPLAY_CMD='
+# Display system info in terminal
+if [ -f /usr/local/bin/bootinfo.sh ]; then
+    /usr/local/bin/bootinfo.sh > /tmp/.bootinfo 2>/dev/null
+    [ -f /tmp/.bootinfo ] && cat /tmp/.bootinfo
+fi
+'
+
+# Add to /etc/profile for all users
+if ! grep -q "bootinfo.sh" /etc/profile 2>/dev/null; then
+    echo "$DISPLAY_CMD" >> /etc/profile
+fi
+
+# Add to /etc/bash.bashrc for bash users
+if [ -f /etc/bash.bashrc ]; then
+    if ! grep -q "bootinfo.sh" /etc/bash.bashrc 2>/dev/null; then
+        echo "$DISPLAY_CMD" >> /etc/bash.bashrc
+    fi
+fi
+
+echo "✓ Added to shell profiles"
+
 # Create systemd path unit to trigger on network changes
-echo "[3/5] Creating systemd path monitor..."
+echo "[4/5] Creating systemd path monitor..."
 cat > /etc/systemd/system/bootinfo.path << 'EOF'
 [Unit]
 Description=Monitor for network changes to update boot info
@@ -77,14 +101,14 @@ EOF
 echo "✓ Created bootinfo.path"
 
 # Reload systemd and enable services
-echo "[4/5] Enabling services..."
+echo "[5/6] Enabling services..."
 systemctl daemon-reload
 systemctl enable bootinfo.service >/dev/null 2>&1
 systemctl enable bootinfo.path >/dev/null 2>&1
 echo "✓ Services enabled for boot"
 
 # Start services and generate initial display
-echo "[5/5] Starting services..."
+echo "[6/6] Starting services..."
 systemctl start bootinfo.service
 systemctl start bootinfo.path
 echo "✓ Services started"
@@ -101,6 +125,7 @@ echo ""
 echo "This will display before login on:"
 echo "  • Console (TTY)"
 echo "  • SSH connections"
+echo "  • Every time you open a terminal"
 echo ""
 echo "Useful commands:"
 echo "  • View current display:  cat /etc/issue"
