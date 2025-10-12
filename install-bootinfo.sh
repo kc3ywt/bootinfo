@@ -128,28 +128,33 @@ echo ""
 echo "Configuring SSH to display banner..."
 if [ -f /etc/ssh/sshd_config ]; then
     # Backup original config
-    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup 2>/dev/null || true
+    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
     
-    # Remove or comment out any existing Banner lines
-    sed -i 's/^Banner/#Banner/' /etc/ssh/sshd_config
+    # Remove any existing Banner lines (commented or not)
+    sed -i '/^#\?Banner/d' /etc/ssh/sshd_config
     
-    # Add our Banner configuration at the end
-    if ! grep -q "# Custom boot info banner" /etc/ssh/sshd_config; then
-        echo "" >> /etc/ssh/sshd_config
-        echo "# Custom boot info banner" >> /etc/ssh/sshd_config
-        echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
-    fi
+    # Remove DebianBanner lines if they exist
+    sed -i '/^#\?DebianBanner/d' /etc/ssh/sshd_config
     
-    # Also ensure DebianBanner is set to no (this shows after username on Debian)
-    if grep -q "^DebianBanner" /etc/ssh/sshd_config; then
-        sed -i 's/^DebianBanner.*/DebianBanner no/' /etc/ssh/sshd_config
+    # Add our configuration to the end of the file
+    cat >> /etc/ssh/sshd_config << 'SSHEOF'
+
+# Custom boot info banner configuration
+Banner /etc/issue.net
+DebianBanner no
+SSHEOF
+    
+    echo "✓ SSH configuration updated"
+    
+    # Test the SSH config before restarting
+    if sshd -t 2>/dev/null; then
+        # Restart SSH service
+        systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+        echo "✓ SSH service restarted successfully"
     else
-        echo "DebianBanner no" >> /etc/ssh/sshd_config
+        echo "⚠ SSH config test failed, restoring backup"
+        cp /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S) /etc/ssh/sshd_config
     fi
-    
-    # Restart SSH service
-    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-    echo "✓ SSH configured to show banner"
 fi
 
 # Remove default Debian issue files that might interfere
