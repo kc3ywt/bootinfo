@@ -11,10 +11,9 @@ Run as root:
 ```bash
 cd 
 apt install git
-git clone https://github.com/kc3ywt/asl3-autoinstall
-cd asl3-autoinstall
-chmod +x auto-install
-./auto-install
+git clone https://github.com/kc3ywt/bootinfo
+chmod +x /bootinfo/install-bootinfo.sh
+/bootinfo/install-bootinfo.sh
 ```
 
 ---
