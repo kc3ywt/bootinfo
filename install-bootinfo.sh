@@ -28,8 +28,18 @@ if [ -z "$IP_ADDRESS" ]; then
     IP_ADDRESS="No network connection"
 fi
 
-# Generate the /etc/issue file
+# Generate the /etc/issue file (pre-login display)
 cat > /etc/issue << ISSUE
+
+================================================================================
+    System: $HOSTNAME
+    IP Address: $IP_ADDRESS
+================================================================================
+
+ISSUE
+
+# Also generate /etc/issue.net for SSH pre-login
+cat > /etc/issue.net << ISSUE
 
 ================================================================================
     System: $HOSTNAME
@@ -112,6 +122,25 @@ echo "[6/6] Starting services..."
 systemctl start bootinfo.service
 systemctl start bootinfo.path
 echo "✓ Services started"
+
+# Ensure SSH shows the banner
+echo ""
+echo "Configuring SSH to display banner..."
+if [ -f /etc/ssh/sshd_config ]; then
+    # Backup original config
+    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+    
+    # Enable Banner in SSH config if not already set
+    if grep -q "^#Banner" /etc/ssh/sshd_config; then
+        sed -i 's/^#Banner.*/Banner \/etc\/issue.net/' /etc/ssh/sshd_config
+    elif ! grep -q "^Banner" /etc/ssh/sshd_config; then
+        echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
+    fi
+    
+    # Restart SSH service
+    systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
+    echo "✓ SSH configured to show banner"
+fi
 
 echo ""
 echo "============================================"
