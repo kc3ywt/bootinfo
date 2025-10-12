@@ -12,8 +12,8 @@ Run as root:
 cd 
 apt install git
 git clone https://github.com/kc3ywt/bootinfo
-chmod +x /bootinfo/install-bootinfo.sh
-/bootinfo/install-bootinfo.sh
+chmod +x bootinfo/install-bootinfo.sh
+bootinfo/install-bootinfo.sh
 ```
 
 ---
