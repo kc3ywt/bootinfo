@@ -130,17 +130,23 @@ if [ -f /etc/ssh/sshd_config ]; then
     # Backup original config
     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
     
-    # Enable Banner in SSH config if not already set
-    if grep -q "^#Banner" /etc/ssh/sshd_config; then
-        sed -i 's/^#Banner.*/Banner \/etc\/issue.net/' /etc/ssh/sshd_config
-    elif ! grep -q "^Banner" /etc/ssh/sshd_config; then
-        echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
-    fi
+    # Remove or comment out any existing Banner lines
+    sed -i 's/^Banner/#Banner/' /etc/ssh/sshd_config
+    
+    # Add our Banner configuration
+    echo "" >> /etc/ssh/sshd_config
+    echo "# Custom boot info banner" >> /etc/ssh/sshd_config
+    echo "Banner /etc/issue.net" >> /etc/ssh/sshd_config
     
     # Restart SSH service
     systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
     echo "✓ SSH configured to show banner"
 fi
+
+# Remove default Debian issue files that might interfere
+echo "Removing default issue files..."
+rm -f /etc/issue.dpkg-dist /etc/issue.net.dpkg-dist
+echo "✓ Default issue files removed"
 
 echo ""
 echo "============================================"
