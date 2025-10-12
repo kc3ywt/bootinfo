@@ -12,10 +12,10 @@ echo "Installing boot information display system..."
 echo ""
 
 # Create the bootinfo.sh script
-echo "[1/5] Creating /usr/local/bin/bootinfo.sh..."
+echo "[1/6] Creating /usr/local/bin/bootinfo.sh..."
 cat > /usr/local/bin/bootinfo.sh << 'EOF'
 #!/bin/bash
-# This script generates /etc/issue with system information
+# Generate system information display
 
 # Get hostname
 HOSTNAME=$(hostname)
@@ -28,7 +28,7 @@ if [ -z "$IP_ADDRESS" ]; then
     IP_ADDRESS="No network connection"
 fi
 
-# Generate the /etc/issue file (pre-login display)
+# Generate /etc/issue for TTY/console login
 cat > /etc/issue << ISSUE
 
 ================================================================================
@@ -38,7 +38,7 @@ cat > /etc/issue << ISSUE
 
 ISSUE
 
-# Also generate /etc/issue.net for SSH pre-login
+# Generate /etc/issue.net for SSH pre-authentication banner
 cat > /etc/issue.net << ISSUE
 
 ================================================================================
@@ -50,15 +50,14 @@ ISSUE
 
 EOF
 
-# Make the script executable
 chmod +x /usr/local/bin/bootinfo.sh
 echo "✓ Created bootinfo.sh"
 
 # Create systemd service
-echo "[2/5] Creating systemd service..."
+echo "[2/6] Creating systemd service..."
 cat > /etc/systemd/system/bootinfo.service << 'EOF'
 [Unit]
-Description=Generate system information for pre-login screen
+Description=Generate system information for login display
 After=network-online.target
 Wants=network-online.target
 
@@ -73,7 +72,7 @@ EOF
 echo "✓ Created bootinfo.service"
 
 # Add to shell profile for terminal display
-echo "[3/5] Adding to shell profiles..."
+echo "[3/6] Adding to shell profiles..."
 DISPLAY_CMD='
 # Display system info in terminal
 if [ -f /usr/local/bin/bootinfo.sh ]; then
@@ -96,8 +95,8 @@ fi
 
 echo "✓ Added to shell profiles"
 
-# Create systemd path unit to trigger on network changes
-echo "[4/5] Creating systemd path monitor..."
+# Create systemd path unit to monitor network changes
+echo "[4/6] Creating systemd path monitor..."
 cat > /etc/systemd/system/bootinfo.path << 'EOF'
 [Unit]
 Description=Monitor for network changes to update boot info
@@ -110,91 +109,81 @@ WantedBy=multi-user.target
 EOF
 echo "✓ Created bootinfo.path"
 
-# Reload systemd and enable services
-echo "[5/6] Enabling services..."
-systemctl daemon-reload
-systemctl enable bootinfo.service >/dev/null 2>&1
-systemctl enable bootinfo.path >/dev/null 2>&1
-echo "✓ Services enabled for boot"
-
-# Start services and generate initial display
-echo "[6/6] Starting services..."
-systemctl start bootinfo.service
-systemctl start bootinfo.path
-echo "✓ Services started"
-
-# Ensure SSH shows the banner
-echo ""
-echo "Configuring SSH to display banner..."
+# Configure SSH to display banner
+echo "[5/6] Configuring SSH banner..."
 if [ -f /etc/ssh/sshd_config ]; then
     # Backup original config
     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
     
-    # Remove any existing Banner lines (commented or not)
+    # Remove any existing Banner and DebianBanner lines
     sed -i '/^#\?Banner/d' /etc/ssh/sshd_config
-    
-    # Remove DebianBanner lines if they exist
     sed -i '/^#\?DebianBanner/d' /etc/ssh/sshd_config
     
-    # Add our configuration to the end of the file
+    # Add our configuration
     cat >> /etc/ssh/sshd_config << 'SSHEOF'
 
-# Custom boot info banner configuration
+# Boot info banner configuration
 Banner /etc/issue.net
 DebianBanner no
 SSHEOF
     
-    echo "✓ SSH configuration updated"
-    
-    # Test the SSH config before restarting
+    # Test SSH config before restarting
     if sshd -t 2>/dev/null; then
-        # Restart SSH service
         systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-        echo "✓ SSH service restarted successfully"
+        echo "✓ SSH configured and restarted"
     else
-        echo "⚠ SSH config test failed, restoring backup"
-        cp /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S) /etc/ssh/sshd_config
+        echo "⚠ SSH config test failed, skipping SSH configuration"
     fi
+else
+    echo "⚠ SSH config not found, skipping SSH configuration"
 fi
 
-# Remove default Debian issue files that might interfere
-echo "Removing default issue files..."
-rm -f /etc/issue.dpkg-dist /etc/issue.net.dpkg-dist
-echo "✓ Default issue files removed"
+# Remove default issue files
+rm -f /etc/issue.dpkg-dist /etc/issue.net.dpkg-dist 2>/dev/null
+
+# Enable and start services
+echo "[6/6] Enabling and starting services..."
+systemctl daemon-reload
+systemctl enable bootinfo.service >/dev/null 2>&1
+systemctl enable bootinfo.path >/dev/null 2>&1
+systemctl start bootinfo.service
+systemctl start bootinfo.path
+echo "✓ Services enabled and started"
 
 echo ""
 echo "============================================"
 echo "Installation complete!"
 echo "============================================"
 echo ""
-echo "Current boot information:"
+echo "Current system information:"
 echo ""
 cat /etc/issue
 echo ""
-echo "This will display before login on:"
-echo "  • Console (TTY)"
-echo "  • SSH connections"
-echo "  • Every time you open a terminal"
+echo "Display locations:"
+echo "  • Console (TTY) - before username prompt"
+echo "  • SSH login - after username, before password"
+echo "  • Terminal - when opening new shell session"
 echo ""
 echo "Useful commands:"
-echo "  • View current display:  cat /etc/issue"
-echo "  • Check service status:  systemctl status bootinfo.service"
+echo "  • View display:          cat /etc/issue"
+echo "  • Check service:         systemctl status bootinfo.service"
 echo "  • Manually update:       sudo /usr/local/bin/bootinfo.sh"
 echo "  • Disable at boot:       sudo systemctl disable bootinfo.service bootinfo.path"
 echo ""
 
-# Delete the install script and parent directory
+# Clean up installation directory
 SCRIPT_PATH="$(readlink -f "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 echo "Cleaning up installation files..."
 
-# Check if we're in a bootinfo directory
 if [[ "$SCRIPT_DIR" == *"/bootinfo"* ]] || [[ "$(basename "$SCRIPT_DIR")" == "bootinfo" ]]; then
     cd /tmp
     rm -rf "$SCRIPT_DIR"
-    echo "✓ Deleted bootinfo directory and all contents"
+    echo "✓ Deleted bootinfo directory"
 else
     rm -f "$SCRIPT_PATH"
-    echo "✓ Installation script deleted"
+    echo "✓ Deleted installation script"
 fi
+
 echo ""
+echo "Installation directory cleaned up successfully!"
