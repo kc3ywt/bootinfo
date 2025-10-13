@@ -20,12 +20,23 @@ cat > /usr/local/bin/bootinfo.sh << 'EOF'
 # Get hostname
 HOSTNAME=$(hostname)
 
-# Get primary IP address (first non-loopback IPv4)
-IP_ADDRESS=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -n1)
+# Get primary IP address - try multiple methods
+# Method 1: Get IP from default route interface
+IP_ADDRESS=$(ip route get 1.1.1.1 2>/dev/null | grep -oP 'src \K\S+')
 
-# If no IP found, show message
+# Method 2: If that fails, try getting any non-loopback IPv4
 if [ -z "$IP_ADDRESS" ]; then
-    IP_ADDRESS="No network connection"
+    IP_ADDRESS=$(ip -4 addr show | grep inet | grep -v '127.0.0.1' | awk '{print $2}' | cut -d/ -f1 | head -n1)
+fi
+
+# Method 3: Try hostname -I as fallback
+if [ -z "$IP_ADDRESS" ]; then
+    IP_ADDRESS=$(hostname -I 2>/dev/null | awk '{print $1}')
+fi
+
+# If still no IP found, show message
+if [ -z "$IP_ADDRESS" ]; then
+    IP_ADDRESS="No IP detected"
 fi
 
 # Generate /etc/issue for TTY/console login
@@ -71,32 +82,8 @@ WantedBy=multi-user.target
 EOF
 echo "✓ Created bootinfo.service"
 
-# Add to shell profile for terminal display
-echo "[3/6] Adding to shell profiles..."
-DISPLAY_CMD='
-# Display system info in terminal
-if [ -f /usr/local/bin/bootinfo.sh ]; then
-    /usr/local/bin/bootinfo.sh > /tmp/.bootinfo 2>/dev/null
-    [ -f /tmp/.bootinfo ] && cat /tmp/.bootinfo
-fi
-'
-
-# Add to /etc/profile for all users
-if ! grep -q "bootinfo.sh" /etc/profile 2>/dev/null; then
-    echo "$DISPLAY_CMD" >> /etc/profile
-fi
-
-# Add to /etc/bash.bashrc for bash users
-if [ -f /etc/bash.bashrc ]; then
-    if ! grep -q "bootinfo.sh" /etc/bash.bashrc 2>/dev/null; then
-        echo "$DISPLAY_CMD" >> /etc/bash.bashrc
-    fi
-fi
-
-echo "✓ Added to shell profiles"
-
 # Create systemd path unit to monitor network changes
-echo "[4/6] Creating systemd path monitor..."
+echo "[3/5] Creating systemd path monitor..."
 cat > /etc/systemd/system/bootinfo.path << 'EOF'
 [Unit]
 Description=Monitor for network changes to update boot info
@@ -110,7 +97,7 @@ EOF
 echo "✓ Created bootinfo.path"
 
 # Configure SSH to display banner
-echo "[5/6] Configuring SSH banner..."
+echo "[4/5] Configuring SSH banner..."
 if [ -f /etc/ssh/sshd_config ]; then
     # Backup original config
     cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
@@ -142,7 +129,7 @@ fi
 rm -f /etc/issue.dpkg-dist /etc/issue.net.dpkg-dist 2>/dev/null
 
 # Enable and start services
-echo "[6/6] Enabling and starting services..."
+echo "[5/5] Enabling and starting services..."
 systemctl daemon-reload
 systemctl enable bootinfo.service >/dev/null 2>&1
 systemctl enable bootinfo.path >/dev/null 2>&1
@@ -162,7 +149,6 @@ echo ""
 echo "Display locations:"
 echo "  • Console (TTY) - before username prompt"
 echo "  • SSH login - after username, before password"
-echo "  • Terminal - when opening new shell session"
 echo ""
 echo "Useful commands:"
 echo "  • View display:          cat /etc/issue"
