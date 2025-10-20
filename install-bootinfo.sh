@@ -17,6 +17,14 @@ cat > /usr/local/bin/bootinfo.sh << 'EOF'
 #!/bin/bash
 # Generate system information display
 
+# Wait for network to be ready (max 30 seconds)
+for i in {1..30}; do
+    if ip route get 1.1.1.1 >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+
 # Get hostname
 HOSTNAME=$(hostname)
 
