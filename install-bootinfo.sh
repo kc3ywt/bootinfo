@@ -49,16 +49,6 @@ cat > /etc/issue << ISSUE
 
 ISSUE
 
-# Generate /etc/issue.net for SSH pre-authentication banner
-cat > /etc/issue.net << ISSUE
-
-================================================================================
-    System: $HOSTNAME
-    IP Address: $IP_ADDRESS
-================================================================================
-
-ISSUE
-
 EOF
 
 chmod +x /usr/local/bin/bootinfo.sh
@@ -83,7 +73,7 @@ EOF
 echo "✓ Created bootinfo.service"
 
 # Create systemd path unit to monitor network changes
-echo "[3/5] Creating systemd path monitor..."
+echo "[3/4] Creating systemd path monitor..."
 cat > /etc/systemd/system/bootinfo.path << 'EOF'
 [Unit]
 Description=Monitor for network changes to update boot info
@@ -96,40 +86,11 @@ WantedBy=multi-user.target
 EOF
 echo "✓ Created bootinfo.path"
 
-# Configure SSH to display banner
-echo "[4/5] Configuring SSH banner..."
-if [ -f /etc/ssh/sshd_config ]; then
-    # Backup original config
-    cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup.$(date +%Y%m%d_%H%M%S) 2>/dev/null || true
-    
-    # Remove any existing Banner and DebianBanner lines
-    sed -i '/^#\?Banner/d' /etc/ssh/sshd_config
-    sed -i '/^#\?DebianBanner/d' /etc/ssh/sshd_config
-    
-    # Add our configuration
-    cat >> /etc/ssh/sshd_config << 'SSHEOF'
-
-# Boot info banner configuration
-Banner /etc/issue.net
-DebianBanner no
-SSHEOF
-    
-    # Test SSH config before restarting
-    if sshd -t 2>/dev/null; then
-        systemctl restart sshd 2>/dev/null || systemctl restart ssh 2>/dev/null
-        echo "✓ SSH configured and restarted"
-    else
-        echo "⚠ SSH config test failed, skipping SSH configuration"
-    fi
-else
-    echo "⚠ SSH config not found, skipping SSH configuration"
-fi
-
 # Remove default issue files
 rm -f /etc/issue.dpkg-dist /etc/issue.net.dpkg-dist 2>/dev/null
 
 # Enable and start services
-echo "[5/5] Enabling and starting services..."
+echo "[4/4] Enabling and starting services..."
 systemctl daemon-reload
 systemctl enable bootinfo.service >/dev/null 2>&1
 systemctl enable bootinfo.path >/dev/null 2>&1
@@ -148,7 +109,6 @@ cat /etc/issue
 echo ""
 echo "Display locations:"
 echo "  • Console (TTY) - before username prompt"
-echo "  • SSH login - after username, before password"
 echo ""
 echo "Useful commands:"
 echo "  • View display:          cat /etc/issue"
