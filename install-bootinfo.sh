@@ -69,11 +69,13 @@ cat > /etc/systemd/system/bootinfo.service << 'EOF'
 Description=Generate system information for login display
 After=network-online.target
 Wants=network-online.target
+Requires=network-online.target
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/bootinfo.sh
 RemainAfterExit=yes
+TimeoutStartSec=60
 
 [Install]
 WantedBy=multi-user.target
@@ -94,8 +96,8 @@ WantedBy=multi-user.target
 EOF
 echo "✓ Created bootinfo.path"
 
-# Remove default issue files
-rm -f /etc/issue.dpkg-dist /etc/issue.net.dpkg-dist 2>/dev/null
+# Remove default issue files that might interfere with TTY display
+rm -f /etc/issue.dpkg-dist 2>/dev/null
 
 # Enable and start services
 echo "[4/4] Enabling and starting services..."
